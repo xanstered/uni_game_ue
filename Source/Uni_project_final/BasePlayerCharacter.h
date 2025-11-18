@@ -24,6 +24,9 @@ class UNI_PROJECT_FINAL_API ABasePlayerCharacter : public ABaseCharacter
 public:
 	ABasePlayerCharacter();
 
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void PerformWeaponAttackTrace();
+
 protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")

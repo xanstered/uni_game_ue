@@ -141,9 +141,9 @@ void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
         return;
     }
 
-    PerformWeaponTrace();
+    //PerformWeaponTrace();
 
-    DeactivateWeaponCollision();
+    //DeactivateWeaponCollision();
 
 
     if (GEngine)
@@ -179,11 +179,11 @@ void AWeapon::PerformWeaponTrace()
         BoxTraceExtent,
         Orientation,
         ETraceTypeQuery::TraceTypeQuery1,
-        false,                           
-        TArray<AActor*>(),            
-        EDrawDebugTrace::None,           
+        false,
+        TArray<AActor*>(),
+        EDrawDebugTrace::ForDuration,    
         HitResult,
-        true                             
+        true
     );
 
 #if ENABLE_DRAW_DEBUG
@@ -215,3 +215,4 @@ void AWeapon::PerformWeaponTrace()
         }
     }
 }
+

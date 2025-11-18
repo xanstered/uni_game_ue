@@ -193,3 +193,16 @@ void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
         }
     }
 }
+
+void ABasePlayerCharacter::PerformWeaponAttackTrace()
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, TEXT("Trace initiated by Character"));
+    }
+
+    if (CurrentWeapon)
+    {
+        CurrentWeapon->PerformWeaponTrace();
+    }
+}

@@ -32,6 +32,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void OnAimNotify();
 
+    void PerformWeaponTrace();
+
 protected:
     virtual void BeginPlay() override;
 
@@ -47,7 +49,7 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Trace")
     FVector BoxTraceExtent;
 
-    void PerformWeaponTrace();
+    
 
 private:
     UFUNCTION()
