@@ -38,6 +38,17 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Combat")
     class UBoxComponent* WeaponCollision;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Trace")
+    class USceneComponent* TraceStart;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Trace")
+    class USceneComponent* TraceEnd;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Trace")
+    FVector BoxTraceExtent;
+
+    void PerformWeaponTrace();
+
 private:
     UFUNCTION()
     void OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,

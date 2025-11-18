@@ -182,10 +182,6 @@ void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
                 FString::Printf(TEXT("Socket EXISTS: %s"), *WeaponSocketName.ToString()));
         }
 
-        CurrentWeapon->AttachToComponent(CharacterMesh,
-            FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-            WeaponSocketName);
-
         CurrentWeapon->EquipWeapon(this, CharacterMesh);
     }
     else
@@ -193,14 +189,7 @@ void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Orange,
-                FString::Printf(TEXT("Socket NOT FOUND: %s - attaching to mesh root"), *WeaponSocketName.ToString()));
+                FString::Printf(TEXT("Socket NOT FOUND: %s"), *WeaponSocketName.ToString()));
         }
-
-        CurrentWeapon->AttachToComponent(CharacterMesh,
-            FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-
-        CurrentWeapon->EquipWeapon(this, CharacterMesh);
     }
-
-    CurrentWeapon->SetActorHiddenInGame(false);
 }
