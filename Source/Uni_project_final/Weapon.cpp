@@ -8,6 +8,7 @@
 #include "Math/UnrealMathUtility.h"
 #include "Engine/World.h"
 #include "Math/Quat.h"
+#include "CombatInterface.h"
 
 AWeapon::AWeapon()
 {
@@ -206,6 +207,18 @@ void AWeapon::PerformWeaponTrace()
     {
         AActor* HitActor = HitResult.GetActor();
         FVector ImpactLocation = HitResult.ImpactPoint;
+
+        ICombatInterface* CombatTarget = Cast<ICombatInterface>(HitActor);
+        if (CombatTarget)
+        {
+            CombatTarget->Execute_GetHit(HitActor, Damage); 
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green,
+                    FString::Printf(TEXT("Damage dealt to: %s"), *HitActor->GetName()));
+            }
+        }
 
         if (GEngine)
         {
