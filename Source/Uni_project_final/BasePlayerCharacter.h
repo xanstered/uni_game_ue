@@ -29,6 +29,8 @@ public:
 
 protected:
 
+	
+	
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* MoveAction;
 
@@ -38,6 +40,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* InteractAction;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	UInputAction* LookAction;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UInteractionComponent* InteractionComponent;
 
@@ -55,7 +59,12 @@ protected:
     void Move(const FInputActionValue& Value);
     void Attack(const FInputActionValue& Value);
     void Interact(const FInputActionValue& Value);
+	void Look(const FInputActionValue& Value);
 
+	void DoLook(float Yaw, float Pitch);
+
+
+	
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
     UAnimMontage* AttackMontage;
 

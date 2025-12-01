@@ -45,6 +45,10 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         {
             EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ABasePlayerCharacter::Interact);
         }
+        if (LookAction)
+        {
+            EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ABasePlayerCharacter::Look);
+        }
     }
 }
 
@@ -150,6 +154,30 @@ void ABasePlayerCharacter::Interact(const FInputActionValue& Value)
             }
         }
     }
+}
+
+void ABasePlayerCharacter::Look(const FInputActionValue& Value)
+{
+    FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+    // route the input
+    DoLook(LookAxisVector.X, LookAxisVector.Y);
+
+    
+}
+
+void ABasePlayerCharacter::DoLook(float Yaw, float Pitch)
+{
+    {
+        if (GetController() != nullptr)
+        {
+            // add yaw and pitch input to controller
+            AddControllerYawInput(Yaw);
+            AddControllerPitchInput(Pitch);
+        }
+    }
+
+    
 }
 
 void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
