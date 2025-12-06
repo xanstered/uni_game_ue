@@ -34,9 +34,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void StopCurrentAttack();
 
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void ActivateEnemyWeaponCollision();
+
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void DeactivateEnemyWeaponCollision();
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UAttributesComponent* AttributesComponent;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+    class AWeapon* EnemyWeapon;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
     EPawnState PawnState; 

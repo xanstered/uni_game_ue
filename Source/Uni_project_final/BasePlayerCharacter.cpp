@@ -8,6 +8,9 @@
 #include "InteractionComponent.h"
 #include "InteractionInterface.h"
 #include "Weapon.h"
+#include "AttributesComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 ABasePlayerCharacter::ABasePlayerCharacter()
 {
@@ -15,14 +18,22 @@ ABasePlayerCharacter::ABasePlayerCharacter()
 
     InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
 
-    CurrentWeapon = nullptr;
+    AttributesComponent = CreateDefaultSubobject<UAttributesComponent>(TEXT("AttributesComponent"));
 
+    CurrentWeapon = nullptr;
     WeaponSocketName = FName("WeaponSocket");
+
+    CombatState = EPlayerState::E_Idle; 
 }
 
 void ABasePlayerCharacter::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (AttributesComponent)
+    {
+        AttributesComponent->OnDeathDelegate.AddDynamic(this, &ABasePlayerCharacter::HandleDeath);
+    }
 }
 
 void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -52,6 +63,35 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
     }
 }
 
+void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)  // ZMIENIONE
+{
+    CombatState = NewState;  // ZMIENIONE
+
+    if (GEngine)
+    {
+        FString StateString;
+        switch (NewState)
+        {
+        case EPlayerState::E_Idle: StateString = "Idle"; break;  // ZMIENIONE
+        case EPlayerState::E_Combat: StateString = "Combat"; break;  // ZMIENIONE
+        case EPlayerState::E_Hit: StateString = "Hit"; break;  // ZMIENIONE
+        case EPlayerState::E_Occupied: StateString = "Occupied"; break;  // ZMIENIONE
+        case EPlayerState::E_Dead: StateString = "Dead"; break;  // ZMIENIONE
+        }
+
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
+            FString::Printf(TEXT("Player Combat State: %s"), *StateString));
+    }
+}
+
+bool ABasePlayerCharacter::CanPerformAttack() const
+{
+    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)  // ZMIENIONE
+        && CombatState != EPlayerState::E_Hit  // ZMIENIONE
+        && CombatState != EPlayerState::E_Occupied  // ZMIENIONE
+        && CombatState != EPlayerState::E_Dead;  // ZMIENIONE
+}
+
 void ABasePlayerCharacter::Move(const FInputActionValue& Value)
 {
     FVector2D MovementVector = Value.Get<FVector2D>();
@@ -76,7 +116,7 @@ void ABasePlayerCharacter::Attack(const FInputActionValue& Value)
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Attack pressed"));
     }
 
-    if (CurrentWeapon)
+    if (CurrentWeapon && CanPerformAttack())
     {
         PlayAttackMontage();
     }
@@ -84,15 +124,18 @@ void ABasePlayerCharacter::Attack(const FInputActionValue& Value)
     {
         if (GEngine)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("No weapon equipped"));
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
+                TEXT("Cannot attack - no weapon or wrong state"));
         }
     }
 }
 
 void ABasePlayerCharacter::PlayAttackMontage()
 {
-    if (AttackMontage)
+    if (AttackMontage && CanPerformAttack())
     {
+        SetPlayerState(EPlayerState::E_Occupied); 
+
         UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
         if (AnimInstance)
         {
@@ -108,7 +151,7 @@ void ABasePlayerCharacter::PlayAttackMontage()
     {
         if (GEngine)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("No AttackMontage assigned"));
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("No AttackMontage or can't attack"));
         }
     }
 }
@@ -159,25 +202,16 @@ void ABasePlayerCharacter::Interact(const FInputActionValue& Value)
 void ABasePlayerCharacter::Look(const FInputActionValue& Value)
 {
     FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-    // route the input
     DoLook(LookAxisVector.X, LookAxisVector.Y);
-
-    
 }
 
 void ABasePlayerCharacter::DoLook(float Yaw, float Pitch)
 {
+    if (GetController() != nullptr)
     {
-        if (GetController() != nullptr)
-        {
-            // add yaw and pitch input to controller
-            AddControllerYawInput(Yaw);
-            AddControllerPitchInput(Pitch);
-        }
+        AddControllerYawInput(Yaw);
+        AddControllerPitchInput(Pitch);
     }
-
-    
 }
 
 void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
@@ -232,5 +266,78 @@ void ABasePlayerCharacter::PerformWeaponAttackTrace()
     if (CurrentWeapon)
     {
         CurrentWeapon->PerformWeaponTrace();
+    }
+}
+
+void ABasePlayerCharacter::GetHit_Implementation(float DamageAmount)
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red,
+            FString::Printf(TEXT("=== PLAYER HIT! Damage: %.2f ==="), DamageAmount));
+    }
+
+    if (CombatState == EPlayerState::E_Dead) 
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, TEXT("Player already dead"));
+        }
+        return;
+    }
+
+    if (AttributesComponent)
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow,
+                FString::Printf(TEXT("Health before: %.1f"), AttributesComponent->GetHealth()));
+        }
+
+        AttributesComponent->SubtractHealth(DamageAmount);
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow,
+                FString::Printf(TEXT("Health after: %.1f"), AttributesComponent->GetHealth()));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, TEXT("ERROR: No AttributesComponent!"));
+        }
+    }
+
+    if (CombatState != EPlayerState::E_Dead) 
+    {
+        SetPlayerState(EPlayerState::E_Hit);
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Player state set to HIT"));
+        }
+    }
+}
+
+void ABasePlayerCharacter::HandleDeath()
+{
+    SetPlayerState(EPlayerState::E_Dead);  
+
+    if (GetCapsuleComponent())
+    {
+        GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    }
+
+    if (GetMovementComponent())
+    {
+        GetMovementComponent()->StopMovementImmediately();
+    }
+
+    DisableInput(Cast<APlayerController>(GetController()));
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Black, TEXT("=== PLAYER DEAD ==="));
     }
 }

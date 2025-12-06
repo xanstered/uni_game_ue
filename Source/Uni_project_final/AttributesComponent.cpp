@@ -1,4 +1,5 @@
 #include "AttributesComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UAttributesComponent::UAttributesComponent()
 {
@@ -24,8 +25,16 @@ void UAttributesComponent::SubtractHealth(float DamageAmount)
             FString::Printf(TEXT("START HEALTH: %.1f, DAMAGE: %.1f"), Health, DamageAmount));
     }
 
-    // Obliczanie nowego zdrowia i upewnienie siê, ¿e nie spadnie poni¿ej 0
     Health = FMath::Clamp(Health - DamageAmount, 0.0f, MaxHealth);
+
+    if (HitSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            this,
+            HitSound,
+            GetOwner()->GetActorLocation()
+        );
+    }
 
     if (GEngine)
     {

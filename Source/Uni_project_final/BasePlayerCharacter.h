@@ -1,36 +1,45 @@
 #pragma once
 
-
 #include "CoreMinimal.h"
 #include "BaseCharacter.h"
 #include "InteractionComponent.h" 
 #include "InteractionInterface.h"  
 #include "Weapon.h"
+#include "CombatInterface.h"
 #include "BasePlayerCharacter.generated.h"
-
 
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
 
-/**
- * 
- */
-UCLASS()
-class UNI_PROJECT_FINAL_API ABasePlayerCharacter : public ABaseCharacter
+UENUM(BlueprintType)
+enum class EPlayerState : uint8  
 {
-	GENERATED_BODY()
-	
+    E_Idle,
+    E_Combat,
+    E_Hit,
+    E_Occupied,
+    E_Dead
+};
+
+UCLASS()
+class UNI_PROJECT_FINAL_API ABasePlayerCharacter : public ABaseCharacter, public ICombatInterface
+{
+    GENERATED_BODY()
+
 public:
-	ABasePlayerCharacter();
+    ABasePlayerCharacter();
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void PerformWeaponAttackTrace();
 
-protected:
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    bool CanPerformAttack() const;
 
-	
-	
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void PlayAttackMontage();
+
+protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* MoveAction;
 
@@ -40,10 +49,14 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* InteractAction;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
-	UInputAction* LookAction;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+    UInputAction* LookAction;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UInteractionComponent* InteractionComponent;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    class UAttributesComponent* AttributesComponent;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
     AWeapon* CurrentWeapon;
@@ -51,24 +64,34 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
     FName WeaponSocketName;
 
-    void EquipWeapon(AWeapon* NewWeapon);
+    UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
+    EPlayerState CombatState;  
 
+    UFUNCTION(BlueprintCallable, Category = "State")
+    void SetPlayerState(EPlayerState NewState);
+
+    void EquipWeapon(AWeapon* NewWeapon);
 
     virtual void BeginPlay() override;
 
     void Move(const FInputActionValue& Value);
     void Attack(const FInputActionValue& Value);
     void Interact(const FInputActionValue& Value);
-	void Look(const FInputActionValue& Value);
+    void Look(const FInputActionValue& Value);
+    void DoLook(float Yaw, float Pitch);
 
-	void DoLook(float Yaw, float Pitch);
-
-
-	
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
     UAnimMontage* AttackMontage;
 
-    void PlayAttackMontage();
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+    UAnimMontage* HitMontage;
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat")
+    void GetHit(float DamageAmount);
+    virtual void GetHit_Implementation(float DamageAmount) override;
+
+    UFUNCTION()
+    void HandleDeath();
 
 public:
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

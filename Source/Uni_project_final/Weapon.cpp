@@ -139,15 +139,16 @@ void AWeapon::OnAimNotify()
 void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
     UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-    if (!OtherActor || OtherActor == this || OtherActor == GetOwner() || Cast<ABaseEnemyCharacter>(OtherActor) == nullptr) 
+    if (!OtherActor || OtherActor == this || OtherActor == GetOwner())
     {
         return;
     }
 
-    //PerformWeaponTrace();
-
-    //DeactivateWeaponCollision();
-
+    ICombatInterface* CombatTarget = Cast<ICombatInterface>(OtherActor);
+    if (CombatTarget == nullptr)
+    {
+        return;
+    }
 
     if (GEngine)
     {
@@ -155,6 +156,8 @@ void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
             FString::Printf(TEXT("OVERLAP DETECTED with: %s"), *OtherActor->GetName()));
     }
 
+    PerformWeaponTrace();
+    DeactivateWeaponCollision();
 }
 
 void AWeapon::PerformWeaponTrace()

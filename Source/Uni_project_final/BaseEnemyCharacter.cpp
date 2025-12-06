@@ -5,6 +5,7 @@
 #include "Components/SkeletalMeshComponent.h" 
 #include "Animation/AnimMontage.h"
 #include "CombatInterface.h" 
+#include "Weapon.h"
 
 ABaseEnemyCharacter::ABaseEnemyCharacter()
 {
@@ -50,52 +51,20 @@ void ABaseEnemyCharacter::HandleDeath()
 
 void ABaseEnemyCharacter::GetHit_Implementation(float DamageAmount)
 {
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Magenta,
-            FString::Printf(TEXT("=== GetHit CALLED! Damage: %.2f ==="), DamageAmount));
-    }
-
     if (PawnState == EPawnState::E_Dead)
     {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Already dead, ignoring"));
-        }
         return;
-    }
-
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan,
-            FString::Printf(TEXT("AttributesComponent pointer: %p"), AttributesComponent));
     }
 
     if (AttributesComponent)
     {
         if (GEngine)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow,
-                FString::Printf(TEXT("BEFORE SubtractHealth - Current Health: %.1f"),
-                    AttributesComponent->GetHealth()));
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Orange,
+                FString::Printf(TEXT("ATTRIBUTES COMPONENT ADDRESS: %p"), AttributesComponent));
         }
 
         AttributesComponent->SubtractHealth(DamageAmount);
-
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green,
-                FString::Printf(TEXT("AFTER SubtractHealth - New Health: %.1f"),
-                    AttributesComponent->GetHealth()));
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red,
-                TEXT("ERROR: AttributesComponent is NULL!!!"));
-        }
     }
 
     if (PawnState != EPawnState::E_Dead)
@@ -112,7 +81,10 @@ void ABaseEnemyCharacter::GetHit_Implementation(float DamageAmount)
 
 bool ABaseEnemyCharacter::CanPerformAttack() const
 {
-    return (PawnState == EPawnState::E_Combat || PawnState == EPawnState::E_Idle) && PawnState != EPawnState::E_Hit && PawnState != EPawnState::E_Occupied && PawnState != EPawnState::E_Dead;
+    return (PawnState == EPawnState::E_Combat || PawnState == EPawnState::E_Idle)
+        && PawnState != EPawnState::E_Hit
+        && PawnState != EPawnState::E_Occupied
+        && PawnState != EPawnState::E_Dead;
 }
 
 void ABaseEnemyCharacter::StartAttack()
@@ -152,6 +124,46 @@ void ABaseEnemyCharacter::StopCurrentAttack()
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ENEMY ATTACK INTERRUPTED!"));
+        }
+    }
+}
+
+void ABaseEnemyCharacter::ActivateEnemyWeaponCollision()
+{
+    if (EnemyWeapon)
+    {
+        EnemyWeapon->ActivateWeaponCollision();
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("ENEMY weapon collision activated"));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ERROR: EnemyWeapon is NULL!"));
+        }
+    }
+}
+
+void ABaseEnemyCharacter::DeactivateEnemyWeaponCollision()
+{
+    if (EnemyWeapon)
+    {
+        EnemyWeapon->DeactivateWeaponCollision();
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ENEMY weapon collision deactivated"));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ERROR: EnemyWeapon is NULL!"));
         }
     }
 }

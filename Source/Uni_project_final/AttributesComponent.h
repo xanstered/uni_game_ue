@@ -15,6 +15,9 @@ class UNI_PROJECT_FINAL_API UAttributesComponent : public UActorComponent
 public:
     UAttributesComponent();
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio")
+    USoundBase* HitSound;
+
 private:
     UPROPERTY(EditAnywhere, Category = "Attributes")
     float MaxHealth = 75.0f;
