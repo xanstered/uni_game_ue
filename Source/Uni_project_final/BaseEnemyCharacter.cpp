@@ -50,14 +50,52 @@ void ABaseEnemyCharacter::HandleDeath()
 
 void ABaseEnemyCharacter::GetHit_Implementation(float DamageAmount)
 {
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Magenta,
+            FString::Printf(TEXT("=== GetHit CALLED! Damage: %.2f ==="), DamageAmount));
+    }
+
     if (PawnState == EPawnState::E_Dead)
     {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Already dead, ignoring"));
+        }
         return;
+    }
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan,
+            FString::Printf(TEXT("AttributesComponent pointer: %p"), AttributesComponent));
     }
 
     if (AttributesComponent)
     {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow,
+                FString::Printf(TEXT("BEFORE SubtractHealth - Current Health: %.1f"),
+                    AttributesComponent->GetHealth()));
+        }
+
         AttributesComponent->SubtractHealth(DamageAmount);
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green,
+                FString::Printf(TEXT("AFTER SubtractHealth - New Health: %.1f"),
+                    AttributesComponent->GetHealth()));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red,
+                TEXT("ERROR: AttributesComponent is NULL!!!"));
+        }
     }
 
     if (PawnState != EPawnState::E_Dead)

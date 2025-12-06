@@ -20,7 +20,7 @@ private:
     float MaxHealth = 75.0f;
 
     UPROPERTY(VisibleAnywhere, Category = "Attributes")
-    float Health;
+    float Health = 0.0f;
 
 protected:
     virtual void BeginPlay() override;

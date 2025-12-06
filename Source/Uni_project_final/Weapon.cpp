@@ -14,6 +14,8 @@ AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = false;
 
+    Damage = 10.0f;
+
     WeaponCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("WeaponCollision"));
     WeaponCollision->SetupAttachment(RootComponent);
     WeaponCollision->SetBoxExtent(FVector(50.0f, 10.0f, 10.0f)); 
@@ -211,6 +213,12 @@ void AWeapon::PerformWeaponTrace()
         ICombatInterface* CombatTarget = Cast<ICombatInterface>(HitActor);
         if (CombatTarget)
         {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red,
+                    FString::Printf(TEXT("ATTACK VALUE SENT: %.2f"), Damage));
+            }
+
             CombatTarget->Execute_GetHit(HitActor, Damage); 
 
             if (GEngine)
