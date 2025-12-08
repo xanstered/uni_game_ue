@@ -39,6 +39,15 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void PlayAttackMontage();
 
+    UFUNCTION()
+    void AnimNotify_AttackTrace();
+
+    UFUNCTION()
+    void AnimNotify_AttackEnd();
+
+    UFUNCTION()
+    void AnimNotify_HitEnd();
+
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* MoveAction;
@@ -86,12 +95,21 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
     UAnimMontage* HitMontage;
 
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void PlayHitMontage();
+
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat")
     void GetHit(float DamageAmount);
     virtual void GetHit_Implementation(float DamageAmount) override;
 
     UFUNCTION()
     void HandleDeath();
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+    UAnimMontage* DeathMontage;
+
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void PlayDeathMontage();
 
 public:
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

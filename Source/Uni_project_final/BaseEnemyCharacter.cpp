@@ -56,6 +56,17 @@ void ABaseEnemyCharacter::GetHit_Implementation(float DamageAmount)
         return;
     }
 
+    if (PawnState == EPawnState::E_Occupied)
+    {
+        StopCurrentAttack();
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                TEXT("ENEMY: Attack interrupted by hit!"));
+        }
+    }
+
     if (AttributesComponent)
     {
         if (GEngine)
@@ -71,10 +82,38 @@ void ABaseEnemyCharacter::GetHit_Implementation(float DamageAmount)
     {
         SetPawnState(EPawnState::E_Hit);
 
+        PlayHitMontage();
+
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
                 FString::Printf(TEXT("ENEMY: HIT! State: %s"), *UEnum::GetValueAsString(PawnState)));
+        }
+    }
+}
+
+void ABaseEnemyCharacter::PlayHitMontage()
+{
+    UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+    if (AnimInstance && HitMontage)
+    {
+        AnimInstance->Montage_Play(HitMontage);
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+                TEXT("ENEMY: Playing Hit Animation"));
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            if (!HitMontage)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                    TEXT("ERROR: HitMontage is NULL!"));
+            }
         }
     }
 }
@@ -89,6 +128,12 @@ bool ABaseEnemyCharacter::CanPerformAttack() const
 
 void ABaseEnemyCharacter::StartAttack()
 {
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Cyan,
+            TEXT("=== StartAttack CALLED ==="));
+    }
+
     if (CanPerformAttack())
     {
         SetPawnState(EPawnState::E_Occupied);
@@ -100,12 +145,47 @@ void ABaseEnemyCharacter::StartAttack()
 
             if (GEngine)
             {
-                GEngine->AddOnScreenDebugMessage(-1, Duration, FColor::Magenta, TEXT("ENEMY: Attacking!"));
+                GEngine->AddOnScreenDebugMessage(-1, Duration, FColor::Magenta,
+                    FString::Printf(TEXT("ENEMY: Attacking! Duration: %.2f"), Duration));
             }
+
+            FTimerHandle AttackEndTimerHandle;
+            GetWorld()->GetTimerManager().SetTimer(
+                AttackEndTimerHandle,
+                [this]()
+                {
+                    if (PawnState == EPawnState::E_Occupied)
+                    {
+                        SetPawnState(EPawnState::E_Combat);
+
+                        if (GEngine)
+                        {
+                            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+                                TEXT("ENEMY: Attack finished (Timer), back to Combat"));
+                        }
+                    }
+                },
+                Duration + 0.1f, 
+                false
+            );
         }
         else
         {
             SetPawnState(EPawnState::E_Combat);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                    TEXT("ERROR: No AttackMontage or AnimInstance!"));
+            }
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
+                TEXT("StartAttack called but CanPerformAttack = FALSE"));
         }
     }
 }
@@ -166,4 +246,14 @@ void ABaseEnemyCharacter::DeactivateEnemyWeaponCollision()
             GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("ERROR: EnemyWeapon is NULL!"));
         }
     }
+}
+
+void ABaseEnemyCharacter::AnimNotify_AttackEnd()
+{
+    SetPawnState(EPawnState::E_Combat);
+}
+
+void ABaseEnemyCharacter::AnimNotify_HitEnd()
+{
+    SetPawnState(EPawnState::E_Combat);
 }

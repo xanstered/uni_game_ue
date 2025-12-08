@@ -147,6 +147,11 @@ void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
     ICombatInterface* CombatTarget = Cast<ICombatInterface>(OtherActor);
     if (CombatTarget == nullptr)
     {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red,
+                FString::Printf(TEXT("WEAPON: %s has NO CombatInterface!"), *OtherActor->GetName()));
+        }
         return;
     }
 
@@ -156,7 +161,14 @@ void AWeapon::OnWeaponOverlap(UPrimitiveComponent* OverlappedComponent, AActor* 
             FString::Printf(TEXT("OVERLAP DETECTED with: %s"), *OtherActor->GetName()));
     }
 
-    PerformWeaponTrace();
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
+            FString::Printf(TEXT("Dealing %.2f damage to %s"), Damage, *OtherActor->GetName()));
+    }
+
+    CombatTarget->Execute_GetHit(OtherActor, Damage);
+
     DeactivateWeaponCollision();
 }
 

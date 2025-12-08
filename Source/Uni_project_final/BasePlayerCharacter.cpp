@@ -63,20 +63,20 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
     }
 }
 
-void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)  // ZMIENIONE
+void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)  
 {
-    CombatState = NewState;  // ZMIENIONE
+    CombatState = NewState;  
 
     if (GEngine)
     {
         FString StateString;
         switch (NewState)
         {
-        case EPlayerState::E_Idle: StateString = "Idle"; break;  // ZMIENIONE
-        case EPlayerState::E_Combat: StateString = "Combat"; break;  // ZMIENIONE
-        case EPlayerState::E_Hit: StateString = "Hit"; break;  // ZMIENIONE
-        case EPlayerState::E_Occupied: StateString = "Occupied"; break;  // ZMIENIONE
-        case EPlayerState::E_Dead: StateString = "Dead"; break;  // ZMIENIONE
+        case EPlayerState::E_Idle: StateString = "Idle"; break;   
+        case EPlayerState::E_Combat: StateString = "Combat"; break;   
+        case EPlayerState::E_Hit: StateString = "Hit"; break;   
+        case EPlayerState::E_Occupied: StateString = "Occupied"; break;  
+        case EPlayerState::E_Dead: StateString = "Dead"; break;  
         }
 
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
@@ -86,10 +86,10 @@ void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)  // ZMIENIONE
 
 bool ABasePlayerCharacter::CanPerformAttack() const
 {
-    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)  // ZMIENIONE
-        && CombatState != EPlayerState::E_Hit  // ZMIENIONE
-        && CombatState != EPlayerState::E_Occupied  // ZMIENIONE
-        && CombatState != EPlayerState::E_Dead;  // ZMIENIONE
+    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)   
+        && CombatState != EPlayerState::E_Hit   
+        && CombatState != EPlayerState::E_Occupied   
+        && CombatState != EPlayerState::E_Dead;   
 }
 
 void ABasePlayerCharacter::Move(const FInputActionValue& Value)
@@ -317,12 +317,46 @@ void ABasePlayerCharacter::GetHit_Implementation(float DamageAmount)
         {
             GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Player state set to HIT"));
         }
+        PlayHitMontage();
+    }
+}
+
+void ABasePlayerCharacter::PlayHitMontage()
+{
+    if (HitMontage)
+    {
+        UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+        if (AnimInstance)
+        {
+            AnimInstance->Montage_Play(HitMontage);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+                    TEXT("PLAYER: Playing Hit animation"));
+            }
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                TEXT("ERROR: Player HitMontage is NULL!"));
+        }
     }
 }
 
 void ABasePlayerCharacter::HandleDeath()
 {
-    SetPlayerState(EPlayerState::E_Dead);  
+    SetPlayerState(EPlayerState::E_Dead);
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Black, TEXT("PLAYER: DEAD"));
+    }
+
+    PlayDeathMontage();
 
     if (GetCapsuleComponent())
     {
@@ -334,10 +368,75 @@ void ABasePlayerCharacter::HandleDeath()
         GetMovementComponent()->StopMovementImmediately();
     }
 
-    DisableInput(Cast<APlayerController>(GetController()));
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (PC)
+    {
+        DisableInput(PC);
+    }
 
+    FTimerHandle HideTimerHandle;
+    GetWorld()->GetTimerManager().SetTimer(
+        HideTimerHandle,
+        [this]()
+        {
+            SetActorHiddenInGame(true);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+                    TEXT("PLAYER: Hidden after death"));
+            }
+        },
+        2.5f,
+        false
+    );
+}
+
+void ABasePlayerCharacter::PlayDeathMontage()
+{
+    if (DeathMontage)
+    {
+        UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+        if (AnimInstance)
+        {
+            AnimInstance->Montage_Play(DeathMontage);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red,
+                    TEXT("PLAYER: Playing Death animation"));
+            }
+        }
+    }
+    else
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red,
+                TEXT("ERROR: Player DeathMontage is NULL!"));
+        }
+    }
+}
+
+void ABasePlayerCharacter::AnimNotify_AttackTrace()
+{
     if (GEngine)
     {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Black, TEXT("=== PLAYER DEAD ==="));
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, TEXT("AnimNotify: AttackTrace"));
     }
+    PerformWeaponAttackTrace();
+}
+
+void ABasePlayerCharacter::AnimNotify_AttackEnd()
+{
+    SetPlayerState(EPlayerState::E_Idle);
+}
+
+void ABasePlayerCharacter::AnimNotify_HitEnd()
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Hit animation ended"));
+    }
+    SetPlayerState(EPlayerState::E_Idle);
 }

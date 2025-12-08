@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,11 +9,11 @@
 UENUM(BlueprintType)
 enum class EPawnState : uint8
 {
-    E_Idle,      
-    E_Combat,   
-    E_Hit,         
+    E_Idle,
+    E_Combat,
+    E_Hit,
     E_Occupied,
-    E_Dead          
+    E_Dead
 };
 
 UCLASS()
@@ -26,10 +25,10 @@ public:
     ABaseEnemyCharacter();
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
-    bool CanPerformAttack() const; 
+    bool CanPerformAttack() const;
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
-    void StartAttack(); 
+    void StartAttack();
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void StopCurrentAttack();
@@ -40,6 +39,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void DeactivateEnemyWeaponCollision();
 
+    UFUNCTION()
+    void AnimNotify_AttackEnd();
+
+    UFUNCTION()
+    void AnimNotify_HitEnd();
+
 protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UAttributesComponent* AttributesComponent;
@@ -48,18 +53,25 @@ protected:
     class AWeapon* EnemyWeapon;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
-    EPawnState PawnState; 
+    EPawnState PawnState;
 
     void SetPawnState(EPawnState NewState);
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
     UAnimMontage* AttackMontage;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
+    UAnimMontage* HitMontage;
 
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Combat")
     void GetHit(float DamageAmount);
     virtual void GetHit_Implementation(float DamageAmount) override;
 
-    UFUNCTION() 
-        void HandleDeath(); 
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void PlayHitMontage();
 
-        virtual void BeginPlay() override;
+    UFUNCTION()
+    void HandleDeath();
+
+    virtual void BeginPlay() override;
 };
