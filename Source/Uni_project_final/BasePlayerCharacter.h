@@ -11,15 +11,17 @@
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
+class UMainHUD;
 
 UENUM(BlueprintType)
-enum class EPlayerState : uint8  
+enum class EPlayerState : uint8
 {
     E_Idle,
     E_Combat,
     E_Hit,
     E_Occupied,
-    E_Dead
+    E_Dead,
+    E_Exhausted
 };
 
 UCLASS()
@@ -48,6 +50,9 @@ public:
     UFUNCTION()
     void AnimNotify_HitEnd();
 
+    UFUNCTION(BlueprintPure, Category = "State")
+    EPlayerState GetPlayerState() const { return CombatState; }
+
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* MoveAction;
@@ -60,6 +65,12 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
     UInputAction* LookAction;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+    UInputAction* JumpAction;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+    UInputAction* SprintAction;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UInteractionComponent* InteractionComponent;
@@ -74,7 +85,7 @@ protected:
     FName WeaponSocketName;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
-    EPlayerState CombatState;  
+    EPlayerState CombatState;
 
     UFUNCTION(BlueprintCallable, Category = "State")
     void SetPlayerState(EPlayerState NewState);
@@ -82,12 +93,17 @@ protected:
     void EquipWeapon(AWeapon* NewWeapon);
 
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaTime) override;
 
     void Move(const FInputActionValue& Value);
     void Attack(const FInputActionValue& Value);
     void Interact(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     void DoLook(float Yaw, float Pitch);
+
+    void Jump(const FInputActionValue& Value);
+    void StartSprint(const FInputActionValue& Value);
+    void StopSprint(const FInputActionValue& Value);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
     UAnimMontage* AttackMontage;
@@ -110,6 +126,21 @@ protected:
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void PlayDeathMontage();
+
+    void SetupHUD();
+    void UpdateHUDState();
+
+    UPROPERTY()
+    UMainHUD* PlayerHUD;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float WalkSpeed = 600.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+    float SprintSpeed = 1000.0f;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")
+    bool bIsSprinting = false;
 
 public:
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

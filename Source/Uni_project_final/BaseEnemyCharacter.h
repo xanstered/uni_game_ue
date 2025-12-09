@@ -16,6 +16,8 @@ enum class EPawnState : uint8
     E_Dead
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPawnState, NewState);
+
 UCLASS()
 class UNI_PROJECT_FINAL_API ABaseEnemyCharacter : public ABaseCharacter, public ICombatInterface
 {
@@ -39,21 +41,34 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void DeactivateEnemyWeaponCollision();
 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Combat")
+    bool IsTargetValid(AActor* Target) const;
+
     UFUNCTION()
     void AnimNotify_AttackEnd();
 
     UFUNCTION()
     void AnimNotify_HitEnd();
 
-protected:
+    UPROPERTY(BlueprintAssignable, Category = "State")
+    FOnStateChanged OnStateChanged;
+
+    UFUNCTION(BlueprintPure, Category = "State")
+    EPawnState GetPawnState() const { return PawnState; }
+    
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+    EPawnState PawnState;
+    
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UAttributesComponent* AttributesComponent;
+
+protected:
+    virtual void BeginPlay() override;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     class AWeapon* EnemyWeapon;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
-    EPawnState PawnState;
+    
 
     void SetPawnState(EPawnState NewState);
 
@@ -72,6 +87,4 @@ protected:
 
     UFUNCTION()
     void HandleDeath();
-
-    virtual void BeginPlay() override;
 };

@@ -11,19 +11,21 @@
 #include "AttributesComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "MainHUD.h"
+#include "BasePlayerController.h"
 
 ABasePlayerCharacter::ABasePlayerCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
 
     InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
-
     AttributesComponent = CreateDefaultSubobject<UAttributesComponent>(TEXT("AttributesComponent"));
 
     CurrentWeapon = nullptr;
     WeaponSocketName = FName("WeaponSocket");
-
-    CombatState = EPlayerState::E_Idle; 
+    CombatState = EPlayerState::E_Idle;
+    PlayerHUD = nullptr;
+    bIsSprinting = false;
 }
 
 void ABasePlayerCharacter::BeginPlay()
@@ -33,6 +35,106 @@ void ABasePlayerCharacter::BeginPlay()
     if (AttributesComponent)
     {
         AttributesComponent->OnDeathDelegate.AddDynamic(this, &ABasePlayerCharacter::HandleDeath);
+    }
+
+    if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
+    {
+        MovementComp->MaxWalkSpeed = WalkSpeed;
+    }
+
+    FTimerHandle HUDSetupTimer;
+    GetWorld()->GetTimerManager().SetTimer(
+        HUDSetupTimer,
+        this,
+        &ABasePlayerCharacter::SetupHUD,
+        0.1f,
+        false
+    );
+}
+
+void ABasePlayerCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    UpdateHUDState();
+
+    if (bIsSprinting && AttributesComponent)
+    {
+        float SprintCost = AttributesComponent->GetStaminaCosts().StaminaCost_Sprint;
+
+        if (AttributesComponent->CanPayStaminaCost(SprintCost * DeltaTime))
+        {
+            AttributesComponent->PayStamina(SprintCost * DeltaTime);
+        }
+        else
+        {
+            bIsSprinting = false;
+
+            if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
+            {
+                MovementComp->MaxWalkSpeed = WalkSpeed;
+            }
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                    TEXT("OUT OF STAMINA - Sprint stopped!"));
+            }
+
+            if (PlayerHUD)
+            {
+                PlayerHUD->ShowLowStaminaWarning();
+            }
+        }
+    }
+}
+
+void ABasePlayerCharacter::SetupHUD()
+{
+    ABasePlayerController* PC = Cast<ABasePlayerController>(GetController());
+    if (PC && PC->CurrentHUD)
+    {
+        PlayerHUD = PC->CurrentHUD;
+
+        if (AttributesComponent)
+        {
+            PlayerHUD->BindToAttributesComponent(AttributesComponent);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
+                    TEXT("Player: HUD connected to AttributesComponent"));
+            }
+        }
+    }
+    else
+    {
+        FTimerHandle RetryTimer;
+        GetWorld()->GetTimerManager().SetTimer(RetryTimer, this, &ABasePlayerCharacter::SetupHUD, 0.2f, false);
+    }
+}
+
+void ABasePlayerCharacter::UpdateHUDState()
+{
+    if (PlayerHUD)
+    {
+        FString StateString;
+        switch (CombatState)
+        {
+        case EPlayerState::E_Idle: StateString = "Idle"; break;
+        case EPlayerState::E_Combat: StateString = "Combat"; break;
+        case EPlayerState::E_Hit: StateString = "Hit"; break;
+        case EPlayerState::E_Occupied: StateString = "Occupied"; break;
+        case EPlayerState::E_Dead: StateString = "Dead"; break;
+        case EPlayerState::E_Exhausted: StateString = "Exhausted"; break;
+        }
+
+        if (bIsSprinting)
+        {
+            StateString += " (Sprinting)";
+        }
+
+        PlayerHUD->UpdatePawnState(StateString);
     }
 }
 
@@ -46,12 +148,10 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         {
             EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ABasePlayerCharacter::Move);
         }
-
         if (AttackAction)
         {
             EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ABasePlayerCharacter::Attack);
         }
-
         if (InteractAction)
         {
             EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ABasePlayerCharacter::Interact);
@@ -60,23 +160,35 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         {
             EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ABasePlayerCharacter::Look);
         }
+
+        if (JumpAction)
+        {
+            EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ABasePlayerCharacter::Jump);
+        }
+        if (SprintAction)
+        {
+            EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ABasePlayerCharacter::StartSprint);
+            EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ABasePlayerCharacter::StopSprint);
+            EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ABasePlayerCharacter::StopSprint);
+        }
     }
 }
 
-void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)  
+void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)
 {
-    CombatState = NewState;  
+    CombatState = NewState;
 
     if (GEngine)
     {
         FString StateString;
         switch (NewState)
         {
-        case EPlayerState::E_Idle: StateString = "Idle"; break;   
-        case EPlayerState::E_Combat: StateString = "Combat"; break;   
-        case EPlayerState::E_Hit: StateString = "Hit"; break;   
-        case EPlayerState::E_Occupied: StateString = "Occupied"; break;  
-        case EPlayerState::E_Dead: StateString = "Dead"; break;  
+        case EPlayerState::E_Idle: StateString = "Idle"; break;
+        case EPlayerState::E_Combat: StateString = "Combat"; break;
+        case EPlayerState::E_Hit: StateString = "Hit"; break;
+        case EPlayerState::E_Occupied: StateString = "Occupied"; break;
+        case EPlayerState::E_Dead: StateString = "Dead"; break;
+        case EPlayerState::E_Exhausted: StateString = "Exhausted"; break;
         }
 
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
@@ -86,10 +198,11 @@ void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)
 
 bool ABasePlayerCharacter::CanPerformAttack() const
 {
-    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)   
-        && CombatState != EPlayerState::E_Hit   
-        && CombatState != EPlayerState::E_Occupied   
-        && CombatState != EPlayerState::E_Dead;   
+    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)
+        && CombatState != EPlayerState::E_Hit
+        && CombatState != EPlayerState::E_Occupied
+        && CombatState != EPlayerState::E_Dead
+        && CombatState != EPlayerState::E_Exhausted;
 }
 
 void ABasePlayerCharacter::Move(const FInputActionValue& Value)
@@ -116,16 +229,180 @@ void ABasePlayerCharacter::Attack(const FInputActionValue& Value)
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("Attack pressed"));
     }
 
-    if (CurrentWeapon && CanPerformAttack())
-    {
-        PlayAttackMontage();
-    }
-    else
+    if (!CurrentWeapon)
     {
         if (GEngine)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
-                TEXT("Cannot attack - no weapon or wrong state"));
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("No weapon equipped"));
+        }
+        return;
+    }
+
+    if (!CanPerformAttack())
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("Cannot attack - wrong state"));
+        }
+        return;
+    }
+
+    if (AttributesComponent)
+    {
+        float AttackCost = AttributesComponent->GetStaminaCosts().StaminaCost_Attack;
+
+        if (!AttributesComponent->CanPayStaminaCost(AttackCost))
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                    TEXT("NOT ENOUGH STAMINA FOR ATTACK!"));
+            }
+
+            if (PlayerHUD)
+            {
+                PlayerHUD->ShowLowStaminaWarning();
+            }
+
+            SetPlayerState(EPlayerState::E_Exhausted);
+            FTimerHandle ExhaustedTimer;
+            GetWorld()->GetTimerManager().SetTimer(
+                ExhaustedTimer,
+                [this]()
+                {
+                    if (CombatState == EPlayerState::E_Exhausted)
+                    {
+                        SetPlayerState(EPlayerState::E_Idle);
+                    }
+                },
+                0.5f,
+                false
+            );
+
+            return;
+        }
+
+        AttributesComponent->PayStamina(AttackCost);
+    }
+
+    PlayAttackMontage();
+}
+
+void ABasePlayerCharacter::Jump(const FInputActionValue& Value)
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Jump pressed"));
+    }
+
+    if (CombatState == EPlayerState::E_Dead || CombatState == EPlayerState::E_Hit)
+    {
+        return;
+    }
+
+    if (!GetCharacterMovement()->IsFalling())
+    {
+        if (AttributesComponent)
+        {
+            float JumpCost = AttributesComponent->GetStaminaCosts().StaminaCost_Jump;
+
+            if (!AttributesComponent->CanPayStaminaCost(JumpCost))
+            {
+                if (GEngine)
+                {
+                    GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                        TEXT("NOT ENOUGH STAMINA TO JUMP!"));
+                }
+
+                if (PlayerHUD)
+                {
+                    PlayerHUD->ShowLowStaminaWarning();
+                }
+
+                return;
+            }
+
+            AttributesComponent->PayStamina(JumpCost);
+        }
+
+        ACharacter::Jump();
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Jumped!"));
+        }
+    }
+}
+
+void ABasePlayerCharacter::StartSprint(const FInputActionValue& Value)
+{
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+            FString::Printf(TEXT("Sprint START - setting speed to %.1f"), SprintSpeed));
+    }
+
+    if (CombatState == EPlayerState::E_Dead || CombatState == EPlayerState::E_Hit)
+    {
+        return;
+    }
+
+    if (AttributesComponent)
+    {
+        if (!AttributesComponent->CanPayStaminaCost(1.0f)) 
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
+                    TEXT("NOT ENOUGH STAMINA TO SPRINT!"));
+            }
+
+            if (PlayerHUD)
+            {
+                PlayerHUD->ShowLowStaminaWarning();
+            }
+
+            return;
+        }
+    }
+
+    bIsSprinting = true;
+
+    if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
+    {
+        MovementComp->MaxWalkSpeed = SprintSpeed;
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
+                FString::Printf(TEXT("Sprint ACTIVE - MaxWalkSpeed: %.1f"), MovementComp->MaxWalkSpeed));
+        }
+    }
+}
+
+void ABasePlayerCharacter::StopSprint(const FInputActionValue& Value)
+{
+    if (!bIsSprinting)
+    {
+        return; 
+    }
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+            FString::Printf(TEXT("Sprint stopped - setting speed to %.1f"), WalkSpeed));
+    }
+
+    bIsSprinting = false;
+
+    if (UCharacterMovementComponent* MovementComp = GetCharacterMovement())
+    {
+        MovementComp->MaxWalkSpeed = WalkSpeed;
+
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
+                FString::Printf(TEXT("Current MaxWalkSpeed: %.1f"), MovementComp->MaxWalkSpeed));
         }
     }
 }
@@ -134,7 +411,7 @@ void ABasePlayerCharacter::PlayAttackMontage()
 {
     if (AttackMontage && CanPerformAttack())
     {
-        SetPlayerState(EPlayerState::E_Occupied); 
+        SetPlayerState(EPlayerState::E_Occupied);
 
         UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
         if (AnimInstance)
@@ -145,13 +422,6 @@ void ABasePlayerCharacter::PlayAttackMontage()
             {
                 GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Playing attack animation"));
             }
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("No AttackMontage or can't attack"));
         }
     }
 }
@@ -180,20 +450,6 @@ void ABasePlayerCharacter::Interact(const FInputActionValue& Value)
 
                 Weapon->PickUp_Implementation(this);
                 EquipWeapon(Weapon);
-            }
-            else
-            {
-                if (GEngine)
-                {
-                    GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, TEXT("cast failed"));
-                }
-            }
-        }
-        else
-        {
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange, TEXT("nothing to interact with"));
             }
         }
     }
@@ -238,31 +494,12 @@ void ABasePlayerCharacter::EquipWeapon(AWeapon* NewWeapon)
 
     if (CharacterMesh->DoesSocketExist(WeaponSocketName))
     {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green,
-                FString::Printf(TEXT("Socket EXISTS: %s"), *WeaponSocketName.ToString()));
-        }
-
         CurrentWeapon->EquipWeapon(this, CharacterMesh);
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Orange,
-                FString::Printf(TEXT("Socket NOT FOUND: %s"), *WeaponSocketName.ToString()));
-        }
     }
 }
 
 void ABasePlayerCharacter::PerformWeaponAttackTrace()
 {
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow, TEXT("Trace initiated by Character"));
-    }
-
     if (CurrentWeapon)
     {
         CurrentWeapon->PerformWeaponTrace();
@@ -277,46 +514,24 @@ void ABasePlayerCharacter::GetHit_Implementation(float DamageAmount)
             FString::Printf(TEXT("=== PLAYER HIT! Damage: %.2f ==="), DamageAmount));
     }
 
-    if (CombatState == EPlayerState::E_Dead) 
+    if (CombatState == EPlayerState::E_Dead)
     {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, TEXT("Player already dead"));
-        }
         return;
+    }
+
+    if (bIsSprinting)
+    {
+        StopSprint(FInputActionValue());
     }
 
     if (AttributesComponent)
     {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow,
-                FString::Printf(TEXT("Health before: %.1f"), AttributesComponent->GetHealth()));
-        }
-
         AttributesComponent->SubtractHealth(DamageAmount);
-
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Yellow,
-                FString::Printf(TEXT("Health after: %.1f"), AttributesComponent->GetHealth()));
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red, TEXT("ERROR: No AttributesComponent!"));
-        }
     }
 
-    if (CombatState != EPlayerState::E_Dead) 
+    if (CombatState != EPlayerState::E_Dead)
     {
         SetPlayerState(EPlayerState::E_Hit);
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Player state set to HIT"));
-        }
         PlayHitMontage();
     }
 }
@@ -329,20 +544,6 @@ void ABasePlayerCharacter::PlayHitMontage()
         if (AnimInstance)
         {
             AnimInstance->Montage_Play(HitMontage);
-
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
-                    TEXT("PLAYER: Playing Hit animation"));
-            }
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red,
-                TEXT("ERROR: Player HitMontage is NULL!"));
         }
     }
 }
@@ -354,6 +555,11 @@ void ABasePlayerCharacter::HandleDeath()
     if (GEngine)
     {
         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Black, TEXT("PLAYER: DEAD"));
+    }
+
+    if (bIsSprinting)
+    {
+        StopSprint(FInputActionValue());
     }
 
     PlayDeathMontage();
@@ -377,16 +583,7 @@ void ABasePlayerCharacter::HandleDeath()
     FTimerHandle HideTimerHandle;
     GetWorld()->GetTimerManager().SetTimer(
         HideTimerHandle,
-        [this]()
-        {
-            SetActorHiddenInGame(true);
-
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
-                    TEXT("PLAYER: Hidden after death"));
-            }
-        },
+        [this]() { SetActorHiddenInGame(true); },
         2.5f,
         false
     );
@@ -400,20 +597,6 @@ void ABasePlayerCharacter::PlayDeathMontage()
         if (AnimInstance)
         {
             AnimInstance->Montage_Play(DeathMontage);
-
-            if (GEngine)
-            {
-                GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red,
-                    TEXT("PLAYER: Playing Death animation"));
-            }
-        }
-    }
-    else
-    {
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Red,
-                TEXT("ERROR: Player DeathMontage is NULL!"));
         }
     }
 }
@@ -434,9 +617,5 @@ void ABasePlayerCharacter::AnimNotify_AttackEnd()
 
 void ABasePlayerCharacter::AnimNotify_HitEnd()
 {
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, TEXT("Hit animation ended"));
-    }
     SetPlayerState(EPlayerState::E_Idle);
 }

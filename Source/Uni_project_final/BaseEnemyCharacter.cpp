@@ -6,6 +6,7 @@
 #include "Animation/AnimMontage.h"
 #include "CombatInterface.h" 
 #include "Weapon.h"
+#include "BasePlayerCharacter.h"
 
 ABaseEnemyCharacter::ABaseEnemyCharacter()
 {
@@ -27,6 +28,14 @@ void ABaseEnemyCharacter::BeginPlay()
 void ABaseEnemyCharacter::SetPawnState(EPawnState NewState)
 {
     PawnState = NewState;
+    OnStateChanged.Broadcast(NewState);
+
+    if (GEngine)
+    {
+        FString StateString = UEnum::GetValueAsString(PawnState);
+        GEngine->AddOnScreenDebugMessage(-1, 0.5f, FColor::Purple,
+            FString::Printf(TEXT("ENEMY State: %s"), *StateString));
+    }
 }
 
 void ABaseEnemyCharacter::HandleDeath()
@@ -126,6 +135,44 @@ bool ABaseEnemyCharacter::CanPerformAttack() const
         && PawnState != EPawnState::E_Dead;
 }
 
+bool ABaseEnemyCharacter::IsTargetValid(AActor* Target) const
+{
+    if (!Target)
+    {
+        return false;
+    }
+
+    ABasePlayerCharacter* PlayerCharacter = Cast<ABasePlayerCharacter>(Target);
+    if (PlayerCharacter)
+    {
+        if (PlayerCharacter->GetPlayerState() == EPlayerState::E_Dead)
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
+                    TEXT("ENEMY: Target is DEAD - ignoring"));
+            }
+            return false;
+        }
+    }
+
+    UAttributesComponent* TargetAttributes = Target->FindComponentByClass<UAttributesComponent>();
+    if (TargetAttributes)
+    {
+        if (TargetAttributes->GetHealth() <= 0.0f)
+        {
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Orange,
+                    TEXT("ENEMY: Target has no health - ignoring"));
+            }
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void ABaseEnemyCharacter::StartAttack()
 {
     if (GEngine)
@@ -165,7 +212,7 @@ void ABaseEnemyCharacter::StartAttack()
                         }
                     }
                 },
-                Duration + 0.1f, 
+                Duration + 0.1f,
                 false
             );
         }

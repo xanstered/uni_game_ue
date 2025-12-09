@@ -3,8 +3,9 @@
 
 UAttributesComponent::UAttributesComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
     Health = MaxHealth;
+    Stamina = MaxStamina;
 }
 
 void UAttributesComponent::BeginPlay()
@@ -12,11 +13,21 @@ void UAttributesComponent::BeginPlay()
     Super::BeginPlay();
 
     Health = MaxHealth;
+    Stamina = MaxStamina;
+
+    OnHealthChanged.Broadcast(Health, MaxHealth);
+    OnStaminaChanged.Broadcast(Stamina, MaxStamina);
+}
+
+void UAttributesComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+    RegenerateStamina(DeltaTime);
 }
 
 void UAttributesComponent::SubtractHealth(float DamageAmount)
 {
-    // Upewnienie siê, ¿e obra¿enia s¹ nieujemne
     if (DamageAmount <= 0.0f) return;
 
     if (GEngine)
@@ -26,6 +37,8 @@ void UAttributesComponent::SubtractHealth(float DamageAmount)
     }
 
     Health = FMath::Clamp(Health - DamageAmount, 0.0f, MaxHealth);
+
+    OnHealthChanged.Broadcast(Health, MaxHealth);
 
     if (HitSound)
     {
@@ -50,12 +63,43 @@ void UAttributesComponent::SubtractHealth(float DamageAmount)
         }
         OnDeathDelegate.Broadcast();
     }
-    else
+}
+
+void UAttributesComponent::SetStamina(float NewStamina)
+{
+    Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
+    OnStaminaChanged.Broadcast(Stamina, MaxStamina);
+}
+
+bool UAttributesComponent::CanPayStaminaCost(float Cost) const
+{
+    return Stamina >= Cost;
+}
+
+void UAttributesComponent::PayStamina(float Cost)
+{
+    if (Cost <= 0.0f) return;
+
+    Stamina = FMath::Clamp(Stamina - Cost, 0.0f, MaxStamina);
+    OnStaminaChanged.Broadcast(Stamina, MaxStamina);
+
+    if (GEngine)
     {
-        if (GEngine)
+        GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Yellow,
+            FString::Printf(TEXT("Stamina used: %.1f, Remaining: %.1f"), Cost, Stamina));
+    }
+}
+
+void UAttributesComponent::RegenerateStamina(float DeltaTime)
+{
+    if (Stamina < MaxStamina)
+    {
+        float OldStamina = Stamina;
+        Stamina = FMath::Clamp(Stamina + (StaminaCosts.StaminaRegenRate * DeltaTime), 0.0f, MaxStamina);
+
+        if (OldStamina != Stamina)
         {
-            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow,
-                FString::Printf(TEXT("Health: %.1f / %.1f"), Health, MaxHealth));
+            OnStaminaChanged.Broadcast(Stamina, MaxStamina);
         }
     }
 }
