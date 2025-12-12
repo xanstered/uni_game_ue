@@ -6,6 +6,7 @@
 #include "InteractionInterface.h"  
 #include "Weapon.h"
 #include "CombatInterface.h"
+#include "PawnStateEnum.h"  
 #include "BasePlayerCharacter.generated.h"
 
 class UInputAction;
@@ -13,16 +14,6 @@ class UInputMappingContext;
 struct FInputActionValue;
 class UMainHUD;
 
-UENUM(BlueprintType)
-enum class EPlayerState : uint8
-{
-    E_Idle,
-    E_Combat,
-    E_Hit,
-    E_Occupied,
-    E_Dead,
-    E_Exhausted
-};
 
 UCLASS()
 class UNI_PROJECT_FINAL_API ABasePlayerCharacter : public ABaseCharacter, public ICombatInterface
@@ -51,7 +42,7 @@ public:
     void AnimNotify_HitEnd();
 
     UFUNCTION(BlueprintPure, Category = "State")
-    EPlayerState GetPlayerState() const { return CombatState; }
+    EPawnState GetPlayerState() const { return CombatState; } 
 
 protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
@@ -85,10 +76,10 @@ protected:
     FName WeaponSocketName;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
-    EPlayerState CombatState;
+    EPawnState CombatState; 
 
     UFUNCTION(BlueprintCallable, Category = "State")
-    void SetPlayerState(EPlayerState NewState);
+    void SetPlayerState(EPawnState NewState); 
 
     void EquipWeapon(AWeapon* NewWeapon);
 

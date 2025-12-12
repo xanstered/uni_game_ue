@@ -23,7 +23,7 @@ ABasePlayerCharacter::ABasePlayerCharacter()
 
     CurrentWeapon = nullptr;
     WeaponSocketName = FName("WeaponSocket");
-    CombatState = EPlayerState::E_Idle;
+    CombatState = EPawnState::E_Idle;
     PlayerHUD = nullptr;
     bIsSprinting = false;
 }
@@ -121,12 +121,12 @@ void ABasePlayerCharacter::UpdateHUDState()
         FString StateString;
         switch (CombatState)
         {
-        case EPlayerState::E_Idle: StateString = "Idle"; break;
-        case EPlayerState::E_Combat: StateString = "Combat"; break;
-        case EPlayerState::E_Hit: StateString = "Hit"; break;
-        case EPlayerState::E_Occupied: StateString = "Occupied"; break;
-        case EPlayerState::E_Dead: StateString = "Dead"; break;
-        case EPlayerState::E_Exhausted: StateString = "Exhausted"; break;
+        case EPawnState::E_Idle: StateString = "Idle"; break;
+        case EPawnState::E_Combat: StateString = "Combat"; break;
+        case EPawnState::E_Hit: StateString = "Hit"; break;
+        case EPawnState::E_Occupied: StateString = "Occupied"; break;
+        case EPawnState::E_Dead: StateString = "Dead"; break;
+        case EPawnState::E_Exhausted: StateString = "Exhausted"; break;
         }
 
         if (bIsSprinting)
@@ -174,7 +174,7 @@ void ABasePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
     }
 }
 
-void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)
+void ABasePlayerCharacter::SetPlayerState(EPawnState NewState)
 {
     CombatState = NewState;
 
@@ -183,12 +183,12 @@ void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)
         FString StateString;
         switch (NewState)
         {
-        case EPlayerState::E_Idle: StateString = "Idle"; break;
-        case EPlayerState::E_Combat: StateString = "Combat"; break;
-        case EPlayerState::E_Hit: StateString = "Hit"; break;
-        case EPlayerState::E_Occupied: StateString = "Occupied"; break;
-        case EPlayerState::E_Dead: StateString = "Dead"; break;
-        case EPlayerState::E_Exhausted: StateString = "Exhausted"; break;
+        case EPawnState::E_Idle: StateString = "Idle"; break;
+        case EPawnState::E_Combat: StateString = "Combat"; break;
+        case EPawnState::E_Hit: StateString = "Hit"; break;
+        case EPawnState::E_Occupied: StateString = "Occupied"; break;
+        case EPawnState::E_Dead: StateString = "Dead"; break;
+        case EPawnState::E_Exhausted: StateString = "Exhausted"; break;
         }
 
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan,
@@ -198,11 +198,11 @@ void ABasePlayerCharacter::SetPlayerState(EPlayerState NewState)
 
 bool ABasePlayerCharacter::CanPerformAttack() const
 {
-    return (CombatState == EPlayerState::E_Idle || CombatState == EPlayerState::E_Combat)
-        && CombatState != EPlayerState::E_Hit
-        && CombatState != EPlayerState::E_Occupied
-        && CombatState != EPlayerState::E_Dead
-        && CombatState != EPlayerState::E_Exhausted;
+    return (CombatState == EPawnState::E_Idle || CombatState == EPawnState::E_Combat)
+        && CombatState != EPawnState::E_Hit
+        && CombatState != EPawnState::E_Occupied
+        && CombatState != EPawnState::E_Dead
+        && CombatState != EPawnState::E_Exhausted;
 }
 
 void ABasePlayerCharacter::Move(const FInputActionValue& Value)
@@ -264,15 +264,15 @@ void ABasePlayerCharacter::Attack(const FInputActionValue& Value)
                 PlayerHUD->ShowLowStaminaWarning();
             }
 
-            SetPlayerState(EPlayerState::E_Exhausted);
+            SetPlayerState(EPawnState::E_Exhausted);
             FTimerHandle ExhaustedTimer;
             GetWorld()->GetTimerManager().SetTimer(
                 ExhaustedTimer,
                 [this]()
                 {
-                    if (CombatState == EPlayerState::E_Exhausted)
+                    if (CombatState == EPawnState::E_Exhausted)
                     {
-                        SetPlayerState(EPlayerState::E_Idle);
+                        SetPlayerState(EPawnState::E_Idle);
                     }
                 },
                 0.5f,
@@ -295,7 +295,7 @@ void ABasePlayerCharacter::Jump(const FInputActionValue& Value)
         GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Cyan, TEXT("Jump pressed"));
     }
 
-    if (CombatState == EPlayerState::E_Dead || CombatState == EPlayerState::E_Hit)
+    if (CombatState == EPawnState::E_Dead || CombatState == EPawnState::E_Hit)
     {
         return;
     }
@@ -342,7 +342,7 @@ void ABasePlayerCharacter::StartSprint(const FInputActionValue& Value)
             FString::Printf(TEXT("Sprint START - setting speed to %.1f"), SprintSpeed));
     }
 
-    if (CombatState == EPlayerState::E_Dead || CombatState == EPlayerState::E_Hit)
+    if (CombatState == EPawnState::E_Dead || CombatState == EPawnState::E_Hit)
     {
         return;
     }
@@ -411,7 +411,7 @@ void ABasePlayerCharacter::PlayAttackMontage()
 {
     if (AttackMontage && CanPerformAttack())
     {
-        SetPlayerState(EPlayerState::E_Occupied);
+        SetPlayerState(EPawnState::E_Occupied);
 
         UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
         if (AnimInstance)
@@ -514,7 +514,7 @@ void ABasePlayerCharacter::GetHit_Implementation(float DamageAmount)
             FString::Printf(TEXT("=== PLAYER HIT! Damage: %.2f ==="), DamageAmount));
     }
 
-    if (CombatState == EPlayerState::E_Dead)
+    if (CombatState == EPawnState::E_Dead)
     {
         return;
     }
@@ -529,9 +529,9 @@ void ABasePlayerCharacter::GetHit_Implementation(float DamageAmount)
         AttributesComponent->SubtractHealth(DamageAmount);
     }
 
-    if (CombatState != EPlayerState::E_Dead)
+    if (CombatState != EPawnState::E_Dead)
     {
-        SetPlayerState(EPlayerState::E_Hit);
+        SetPlayerState(EPawnState::E_Hit);
         PlayHitMontage();
     }
 }
@@ -550,7 +550,7 @@ void ABasePlayerCharacter::PlayHitMontage()
 
 void ABasePlayerCharacter::HandleDeath()
 {
-    SetPlayerState(EPlayerState::E_Dead);
+    SetPlayerState(EPawnState::E_Dead);
 
     if (GEngine)
     {
@@ -612,10 +612,10 @@ void ABasePlayerCharacter::AnimNotify_AttackTrace()
 
 void ABasePlayerCharacter::AnimNotify_AttackEnd()
 {
-    SetPlayerState(EPlayerState::E_Idle);
+    SetPlayerState(EPawnState::E_Idle);
 }
 
 void ABasePlayerCharacter::AnimNotify_HitEnd()
 {
-    SetPlayerState(EPlayerState::E_Idle);
+    SetPlayerState(EPawnState::E_Idle);
 }

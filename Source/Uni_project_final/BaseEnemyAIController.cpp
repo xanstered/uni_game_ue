@@ -18,10 +18,9 @@ const FName IsDeadKey("IsDead");
 
 ABaseEnemyAIController::ABaseEnemyAIController()
 {
-    if (!AIPerceptionComponent)
-    {
-        AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerceptionComponent"));
-    }
+    BlackboardComponent = CreateDefaultSubobject<UBlackboardComponent>(TEXT("BlackboardComponent"));
+
+    AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerceptionComponent"));
 
     ConfigurePerception();
 }
@@ -63,12 +62,11 @@ void ABaseEnemyAIController::OnPossess(APawn* InPawn)
 {
     Super::OnPossess(InPawn);
 
-    if (BehaviorTreeAsset && BlackboardComponent)
+    if (BehaviorTreeAsset)
     {
-        if (!BlackboardComponent->InitializeBlackboard(*BehaviorTreeAsset->BlackboardAsset))
+        if (BehaviorTreeAsset->BlackboardAsset)
         {
-            UE_LOG(LogTemp, Error, TEXT("AIController: Failed to initialize Blackboard!"));
-            return;
+            UseBlackboard(BehaviorTreeAsset->BlackboardAsset, BlackboardComponent);
         }
 
         RunBehaviorTree(BehaviorTreeAsset);
@@ -76,7 +74,10 @@ void ABaseEnemyAIController::OnPossess(APawn* InPawn)
         ABaseEnemyCharacter* EnemyChar = Cast<ABaseEnemyCharacter>(InPawn);
         if (EnemyChar)
         {
-            BlackboardComponent->SetValueAsEnum(PawnStateKey, (uint8)EnemyChar->PawnState);
+            if (BlackboardComponent)
+            {
+                BlackboardComponent->SetValueAsEnum(PawnStateKey, (uint8)EnemyChar->PawnState);
+            }
 
             EnemyChar->OnStateChanged.AddDynamic(this, &ABaseEnemyAIController::UpdatePawnStateInBlackboard);
 
@@ -86,18 +87,28 @@ void ABaseEnemyAIController::OnPossess(APawn* InPawn)
             }
         }
     }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("AIController: BehaviorTreeAsset is NULL!"));
+    }
 }
 
 void ABaseEnemyAIController::InitializeBlackboard(UBlackboardData* BlackboardData)
 {
     if (BlackboardData && BlackboardComponent)
     {
-        BlackboardComponent->InitializeBlackboard(*BlackboardData);
+        UseBlackboard(BlackboardData, BlackboardComponent);
     }
 }
 
 void ABaseEnemyAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
+    if (!BlackboardComponent)
+    {
+        UE_LOG(LogTemp, Error, TEXT("OnTargetPerceptionUpdated: BlackboardComponent is NULL!"));
+        return;
+    }
+
     ABasePlayerCharacter* PlayerCharacter = Cast<ABasePlayerCharacter>(Actor);
     if (!PlayerCharacter) return;
 
@@ -129,6 +140,63 @@ void ABaseEnemyAIController::HandleEnemyDeath()
     if (BlackboardComponent)
     {
         BlackboardComponent->SetValueAsBool(IsDeadKey, true);
-        StopMovement(); 
+        StopMovement();
     }
+}
+
+void ABaseEnemyAIController::RequestAttack()
+{
+    ABaseEnemyCharacter* EnemyChar = Cast<ABaseEnemyCharacter>(GetPawn());
+    if (!EnemyChar)
+    {
+        UE_LOG(LogTemp, Error, TEXT("RequestAttack: No EnemyCharacter!"));
+        return;
+    }
+
+    if (!EnemyChar->CanPerformAttack())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RequestAttack: Cannot attack - wrong state"));
+        return;
+    }
+
+    if (EnemyChar->AttributesComponent)
+    {
+        float AttackCost = EnemyChar->AttributesComponent->GetStaminaCosts().StaminaCost_Attack;
+
+        if (!EnemyChar->AttributesComponent->CanPayStaminaCost(AttackCost))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("RequestAttack: Not enough stamina"));
+            return;
+        }
+
+        EnemyChar->AttributesComponent->PayStamina(AttackCost);
+    }
+
+    EnemyChar->StartAttack();
+
+    UE_LOG(LogTemp, Display, TEXT("AI: Attack requested successfully"));
+}
+
+bool ABaseEnemyAIController::IsInAttackRange() const
+{
+    if (!BlackboardComponent)
+    {
+        return false;
+    }
+
+    ABaseEnemyCharacter* EnemyChar = Cast<ABaseEnemyCharacter>(GetPawn());
+    if (!EnemyChar)
+    {
+        return false;
+    }
+
+    AActor* Target = Cast<AActor>(BlackboardComponent->GetValueAsObject(TargetActorKey));
+    if (!Target)
+    {
+        return false;
+    }
+
+    float Distance = FVector::Dist(EnemyChar->GetActorLocation(), Target->GetActorLocation());
+
+    return Distance <= AttackRange;
 }

@@ -6,6 +6,7 @@
 #include "Animation/AnimMontage.h"
 #include "CombatInterface.h" 
 #include "Weapon.h"
+#include "NavigationSystem.h"
 #include "BasePlayerCharacter.h"
 
 ABaseEnemyCharacter::ABaseEnemyCharacter()
@@ -13,6 +14,72 @@ ABaseEnemyCharacter::ABaseEnemyCharacter()
     AttributesComponent = CreateDefaultSubobject<UAttributesComponent>(TEXT("AttributesComponent"));
     AttributesComponent->PrimaryComponentTick.bCanEverTick = false;
     PawnState = EPawnState::E_Idle;
+}
+
+void ABaseEnemyCharacter::Tick(float DeltaTime)
+{
+    Super::Tick(DeltaTime);
+
+    CheckIfOnNavMesh();
+}
+
+void ABaseEnemyCharacter::CheckIfOnNavMesh()
+{
+    if (PawnState == EPawnState::E_Dead)
+    {
+        return;
+    }
+
+    UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
+    if (!NavSys)
+    {
+        return;
+    }
+
+    FVector CurrentLocation = GetActorLocation();
+    FNavLocation NavLocation;
+
+    bool bIsOnNavMesh = NavSys->ProjectPointToNavigation(
+        CurrentLocation,
+        NavLocation,
+        FVector(500.0f, 500.0f, 500.0f)
+    );
+
+    if (!bIsOnNavMesh)
+    {
+        if (GEngine)
+        {
+            GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red,
+                TEXT("ENEMY POZA NAVMESH! Teleportacja"));
+        }
+
+        FNavLocation NearestNavLocation;
+        bool bFoundNavPoint = NavSys->GetRandomPointInNavigableRadius(
+            CurrentLocation,
+            1000.0f,
+            NearestNavLocation
+        );
+
+        if (bFoundNavPoint)
+        {
+            SetActorLocation(NearestNavLocation.Location);
+
+            if (GEngine)
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green,
+                    TEXT("Enemy teleportowany na NavMesh"));
+            }
+        }
+        else
+        {
+            if (GetMovementComponent())
+            {
+                GetMovementComponent()->StopMovementImmediately();
+            }
+
+            UE_LOG(LogTemp, Error, TEXT("CRITICAL: Cannot find NavMesh for Enemy!"));
+        }
+    }
 }
 
 void ABaseEnemyCharacter::BeginPlay()
@@ -23,6 +90,9 @@ void ABaseEnemyCharacter::BeginPlay()
     {
         AttributesComponent->OnDeathDelegate.AddDynamic(this, &ABaseEnemyCharacter::HandleDeath);
     }
+
+    EPawnState TestState = EPawnState::E_Idle;
+    UE_LOG(LogTemp, Warning, TEXT("Enum test passed!"));
 }
 
 void ABaseEnemyCharacter::SetPawnState(EPawnState NewState)
@@ -145,7 +215,7 @@ bool ABaseEnemyCharacter::IsTargetValid(AActor* Target) const
     ABasePlayerCharacter* PlayerCharacter = Cast<ABasePlayerCharacter>(Target);
     if (PlayerCharacter)
     {
-        if (PlayerCharacter->GetPlayerState() == EPlayerState::E_Dead)
+        if (PlayerCharacter->GetPlayerState() == EPawnState::E_Dead)
         {
             if (GEngine)
             {

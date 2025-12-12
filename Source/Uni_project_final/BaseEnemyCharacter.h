@@ -4,17 +4,10 @@
 #include "BaseCharacter.h"
 #include "CombatInterface.h" 
 #include "AttributesComponent.h"
+#include "PawnStateEnum.h"  
+#include "Delegates/DelegateCombinations.h"
 #include "BaseEnemyCharacter.generated.h"
 
-UENUM(BlueprintType)
-enum class EPawnState : uint8
-{
-    E_Idle,
-    E_Combat,
-    E_Hit,
-    E_Occupied,
-    E_Dead
-};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStateChanged, EPawnState, NewState);
 
@@ -50,25 +43,23 @@ public:
     UFUNCTION()
     void AnimNotify_HitEnd();
 
-    UPROPERTY(BlueprintAssignable, Category = "State")
-    FOnStateChanged OnStateChanged;
-
     UFUNCTION(BlueprintPure, Category = "State")
     EPawnState GetPawnState() const { return PawnState; }
-    
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
     EPawnState PawnState;
-    
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     UAttributesComponent* AttributesComponent;
+
+    UPROPERTY(BlueprintAssignable, Category = "State")
+    FOnStateChanged OnStateChanged;
 
 protected:
     virtual void BeginPlay() override;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
     class AWeapon* EnemyWeapon;
-
-    
 
     void SetPawnState(EPawnState NewState);
 
@@ -87,4 +78,8 @@ protected:
 
     UFUNCTION()
     void HandleDeath();
+
+    virtual void Tick(float DeltaTime) override;
+    UFUNCTION()
+    void CheckIfOnNavMesh();
 };
